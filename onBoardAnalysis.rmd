@@ -1,0 +1,148 @@
+---
+title: Chess Analysis
+author: Karan & Dhaval
+output:
+  cleanrmd::html_document_clean:
+    theme: marx
+---
+# **On board analysis chess games**
+```{r,include=FALSE}
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(kableExtra)
+library(mi)
+library(party)
+library(tidyr)
+```
+
+## Importing dataset
+```{r}
+games <- read.csv("chessGames.csv")
+```
+
+## Seperating moves into black moves and white moves
+```{r}
+games$moves <- strsplit(as.character(games$moves)," ")
+for(i in 1:nrow(games)){
+  temp <- unlist(games$moves[i])
+  games$white_moves[i]<- paste(temp[c(TRUE,FALSE)], collapse = " ")
+  games$black_moves[i]<- paste(temp[c(FALSE,TRUE)], collapse = " ")
+}
+
+games$white_moves <- strsplit((games$white_moves)," ")
+games$black_moves <- strsplit((games$black_moves)," ")
+```
+
+## taking only winner games
+```{r}
+white <- filter(games, winner == "white")
+black <- filter(games, winner == "black")
+```
+
+## Representation of Knight on chess board based on games of winner
+```{r}
+#Represent the board as a matrix
+boardN <- matrix(0,8,8)
+
+df<-data.frame(0,0)
+names(df)<-c("letters","numbers")
+
+for(i in 1:nrow(white)){
+  #for white
+  for(j in 1:length(unlist(white$white_moves[i]))){
+    temp <- unlist(white$white_moves[i])[j]
+    row <- 0
+    col <- 0
+    #find column
+    if(grepl("N", temp, fixed = TRUE) == TRUE){
+      if (grepl("a", temp, fixed = TRUE) == TRUE){
+        col <- 1
+      }
+      else if (grepl("b", temp, fixed = TRUE) == TRUE){
+        col <- 2
+      }
+      else if (grepl("c", temp, fixed = TRUE) == TRUE){
+        col <- 3
+      }
+      else if (grepl("d", temp, fixed = TRUE) == TRUE){
+        col <- 4
+      }
+      else if (grepl("e", temp, fixed = TRUE) == TRUE){
+        col <- 5
+      }
+      else if (grepl("f", temp, fixed = TRUE) == TRUE){
+        col <- 6
+      }
+      else if (grepl("g", temp, fixed = TRUE) == TRUE){
+        col <- 7
+      }
+      else if (grepl("h", temp, fixed = TRUE) == TRUE){
+        col <- 8
+      }
+      
+      #For row
+      if (grepl("1", temp, fixed = TRUE) == TRUE){
+        row <- 1
+      }
+      else if (grepl("2", temp, fixed = TRUE) == TRUE){
+        row <- 2
+      }
+      else if (grepl("3", temp, fixed = TRUE) == TRUE){
+        row <- 3
+      }
+      else if (grepl("4", temp, fixed = TRUE) == TRUE){
+        row <- 4
+      }
+      else if (grepl("5", temp, fixed = TRUE) == TRUE){
+        row <- 5
+      }
+      else if (grepl("6", temp, fixed = TRUE) == TRUE){
+        row <- 6
+      }
+      else if (grepl("7", temp, fixed = TRUE) == TRUE){
+        row <- 7
+      }
+      else if (grepl("8", temp, fixed = TRUE) == TRUE){
+        row <- 8
+      }
+      df2 <- data.frame(col, row)
+      names(df2)<-c("letters","numbers")
+      df <- rbind(df, df2)
+      boardN[row,col] <- boardN[row,col] + 1
+    }
+  }
+}
+```
+
+```{r,include=FALSE}
+df <- filter(df, letters!=0)
+knight_board <- as.data.frame(boardN)
+names(knight_board) <- c("a","b","c","d","e","f","g","h")
+row.names(knight_board) <- c("1","2","3","4","5","6","7","8")
+knight_board
+
+instances <- gather(knight_board,na.rm = TRUE)
+a<-0
+for(i in 1:nrow(instances)){
+  a <- a+1
+  instances$row[i] <- a
+  if (a%%8==0){
+    a <-0
+  }
+}
+
+```
+
+## Graph Representation of Knight on chess board based on games of winner
+```{r}
+ggplot(data=instances, aes(x=key,y=row, fill=value)) +geom_tile(color = 9)+scale_fill_gradient(low="white",high="black") + coord_equal()
+```
+
+
+
+
+
+
+
+

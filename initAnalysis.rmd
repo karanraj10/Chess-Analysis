@@ -1,0 +1,303 @@
+---
+title: Chess Analysis
+author: Karan & Dhaval
+output:
+  cleanrmd::html_document_clean:
+    theme: marx
+---
+
+# **Initial Analysis of chess games**
+```{r,include=FALSE}
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(kableExtra)
+library(mi)
+```
+
+## Importing dataset
+```{r}
+games <- read.csv("chessGames.csv")
+```
+
+## Structure of dataset
+```{r}
+str(games)
+```
+
+## Columns of dataset
+```{r}
+colnames(games)
+```
+
+# Cleaning of dataset
+## Removing unwanted columns
+```{r}
+games <- select(games,"rated","turns","victory_status","winner","increment_code","white_id","white_rating","black_id","black_rating","moves","opening_eco","opening_name")
+colnames(games)
+```
+
+## Converting 'rated' columns value into uppercase
+```{r}
+games$rated <- str_to_upper(games$rated)
+table(games$rated)
+```
+
+## Removing games which have less than 10 turns
+```{r}
+games <- games[games$turns >= 10,]
+```
+
+## Removing extra unwanted parts from opening name
+```{r}
+games$opening_name <- str_split_fixed(games$opening_name, ":", n = 2)[,1]
+games$opening_name <- str_split_fixed(games$opening_name, " [#|]", n = 2)[,1]
+```
+
+## Display rated/unrated games
+```{r}
+table(games$rated)
+```
+
+## Graph of rated/unrated games
+```{r}
+ggplot(games,aes(x=rated))+geom_bar()+xlab(label = "Rated_Games")+ylab(label = "Frequency")+theme_classic()
+```
+
+## Graph of time format of games
+```{r}
+increment<-filter(summarise(group_by(games,increment_code), count=length(increment_code)),count>200)
+ggplot(increment,aes(x=increment_code,y=count))+geom_col()
+```
+
+## Filtering time format values
+```{r}
+games <- within(games, increment_code[increment_code>30] <- 'Classical')
+games <- within(games, increment_code[increment_code<=30 & increment_code >=10] <- 'Rapid')
+games <- within(games, increment_code[increment_code<10 & increment_code >=3] <- 'Blitz')
+games <- within(games, increment_code[increment_code<3] <- 'Bullet')
+```
+
+## Display new filtered time format of games
+```{r}
+table(games$increment_code)
+```
+
+## Graph of new filtered time format of games
+```{r}
+increment<-filter(summarise(group_by(games,increment_code), count=length(increment_code)))
+ggplot(increment,aes(x=increment_code,y=count))+geom_col()
+```
+
+## Display winner of games
+```{r}
+table(games$winner)
+```
+
+## Graph of winner of games
+```{r}
+ggplot(games,aes(x=winner))+geom_bar()+xlab(label = "Winner")+ylab(label = "Frequency")+theme_classic()
+```
+
+## Display Termination(victory status) of games
+```{r}
+table(games$victory_status)
+```
+
+## Graph of Termination(victory status) of games
+```{r}
+ggplot(games,aes(x=victory_status))+geom_bar()+xlab(label = "Victory Status")+ylab(label = "Frequency")+theme_classic()
+```
+
+## Graph of Termination(victory status) with winner of games
+```{r}
+ggplot(games,aes(x=victory_status,fill=winner))+geom_bar(position = "dodge")+theme_classic()
+```
+
+## Calculate combined ratting of players
+```{r}
+combinedRating <- rbind(games$white_rating,games$black_rating)
+```
+
+## Graph of combined ratting of players
+```{r}
+hist(combinedRating,angle = 45, col = "grey", border = "white", main = "Player Rating", xlab = "Rating")
+```
+
+## Graph of number of turns played in games
+```{r}
+ggplot(data = games, aes(x = turns)) + geom_histogram(bins = 50) +geom_vline(xintercept = 10, color = "red")
+```
+
+## Graph of number of games (greater than 100) per opening
+```{r}
+opening<-filter(summarise(group_by(games,opening_name), count=length(opening_name)),count>100)
+ggplot(opening,aes(x=opening_name,y=count))+geom_col()+ coord_flip()
+```
+
+## Display of first 10 games in table form
+```{r}
+kbl(head(select(games,-"moves"),10))
+```
+
+## Finding is there any missing data
+```{r}
+table(is.na(games))
+```
+
+## Display and graph of each pieces movement 
+```{r}
+king=0
+queen=0
+knight=0
+castle=0
+bishop=0
+rook=0
+pawn=0
+strLen=0
+
+# unlist convert list of moves to vector which can be converted to string for compare
+
+#for loop for each game in data set
+for(i in 1:nrow(games)){
+  #for loop for individual game's move list
+  for(j in 1:length(unlist(games$moves[i]))){
+    temp <- unlist(games$moves[i])[j]
+    toString(temp)
+    count=0
+    
+    #w matches word characters it means it counts all moves
+    strLen = strLen + str_count(temp,"\\w+");
+    
+    #matches word characters with their respective notation
+    castle = castle +str_count(temp,"O-O")
+    king = king +str_count(temp,"K")
+    knight = knight +str_count(temp,"N")
+    bishop = bishop +str_count(temp,"B")
+    queen = queen +str_count(temp,"Q")
+    rook = rook + str_count(temp,"R")
+    
+    count = strLen-(castle+king+knight+bishop+queen+rook)
+    pawn = count
+  }
+}
+
+movesPercentage <- c(king/nrow(games),queen/nrow(games),rook/nrow(games),bishop/nrow(games),knight/nrow(games),pawn/nrow(games),castle/nrow(games))
+label <- c("King","Queen","Rook","Bishop","Knight","Pawn","Castle")
+
+barplot(movesPercentage,names.arg=label,xlab="Moves",ylab="Frequency",col="black",
+main="Count Of chess peices move (Average)")
+```
+
+## Opening analysis
+```{r}
+# %>% is pipe function
+# takes game data provide to group by which groups based on winner and then provide to count function which counts the records
+opening_win <- games %>% group_by(winner) %>% count(opening_name, sort = TRUE)
+
+# removing records in which draw is result
+opening_win <- opening_win[opening_win$winner != 'draw',]
+
+# storing top 20 games which are played most
+top20 <- games %>% count(opening_name, sort = TRUE) %>% head(20)
+
+# %in% is matching operator which finds matching values
+# storing all opening which present in top20 data
+
+opening_win <- opening_win[opening_win$opening_name %in% top20$opening_name, ]
+
+kbl(opening_win) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+## Graph of winning probability of each opening
+```{r}
+# aes is mapping function which maps two vars
+# opening_win is data set 
+# aes has 2 vals opening_name and it's count
+# fill=winner represent bar color
+
+ggplot(opening_win, aes(opening_name, n, fill = winner)) +
+  geom_col(position = "fill", color = "lightgray")+
+  coord_flip()+
+  theme_minimal()+
+  scale_fill_manual(values = c("black", "cornsilk"))+
+  labs(y = "Winning Probability", x = NULL, fill = "Winner",
+       title = "Winning Probability of Openings")
+```
+
+## Graph of deep analysis of sicilian defense opening
+```{r}
+sicilian <- games[games$opening_name == "Sicilian Defense",]
+
+ggplot(sicilian, aes(x = white_rating, y = black_rating, color = winner, shape = winner))+
+  geom_point(alpha = 0.8)+
+  theme_minimal()+
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 15),
+    axis.text = element_text(size = 8),
+    axis.title = element_text(size = 8),
+    plot.caption = element_text(color = "grey68")
+  )+
+  scale_color_brewer(palette = "Dark2")+
+  labs(y = "Black Rating", x = "White Rating", color = "Winner", shape = "Winner",
+       title = "Win & Draw Rating with Sicilian Defense Opening")
+```
+
+## Analysis of top 5 opening
+```{r}
+#to store results of each opening
+movedf <- data.frame(matrix(ncol = 7, nrow = 0), stringsAsFactors = FALSE)
+colnames(movedf) <- c("moves", "opening", "colour", "occurrences", "win %", "loss %", "draw %")
+
+#function to find winning ratio of each opening
+
+# grepl function matches strings
+# paste is used to concate multiple strings
+
+opening_stats = function(move,openingName,color="W"){
+  if(color=="W"){
+    
+    # here we are finding rows which starts with provided move (^ indicates start)
+    
+    wins = nrow(subset(games,grepl(paste("^",move,sep = ""),moves) & winner=='white'))
+    looses = nrow(subset(games,grepl(paste("^",move,sep = ""),moves) & winner=='black'))
+  }
+  else if(color=="B"){
+    wins = nrow(subset(games,grepl(paste("^",move,sep = ""),moves) & winner=='black'))
+    looses = nrow(subset(games,grepl(paste("^",move,sep = ""),moves) & winner=='white'))
+  }
+  draws = nrow(subset(games,grepl(paste("^",move,sep = ""),moves) & winner=='draw'))
+  total = wins + looses + draws
+  
+  result_list <- list("moves" = move,"opening"=openingName, "colour" = color, "occurrences" = total, "win %" = wins/total*100, "loss %" = looses/total*100, "draw %" = draws/total*100)
+  movedf[nrow(movedf) + 1,] <<- result_list
+}
+
+# Sicilian Najdorf
+opening_stats("e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6","Sicilian Najdorf")
+opening_stats("e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6","Sicilian Najdorf","B")
+# King's Indian
+opening_stats("d4 Nf6 c4 g6 Nc3 Bg7 e4 d6","King's Indian")
+opening_stats("d4 Nf6 c4 g6 Nc3 Bg7 e4 d6","King's Indian","B")
+# Petrov
+opening_stats("e4 e5 Nf3 Nf6","Petrov")
+# Ruy Lopez
+opening_stats("e4 e5 Nf3 Nc6 Bb5","Ruy Lopez")
+# Ruy Lopez / Berlin
+opening_stats("e4 e5 Nf3 Nc6 Bb5 Nf6","Ruy Lopez / Berlin")
+
+kbl(movedf) %>%
+  kable_styling(bootstrap_options = "striped")
+
+```
+
+
+
+
+
+
+
+
+

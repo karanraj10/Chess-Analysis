@@ -1,0 +1,155 @@
+---
+title: Chess Analysis
+author: Karan & Dhaval
+output:
+  cleanrmd::html_document_clean:
+    theme: marx
+---
+
+# **Advanced Analysis of chess games**
+```{r setup,include=FALSE}
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(kableExtra)
+library(mi)
+library(party)
+library(tidyr)
+```
+
+## Importing dataset
+```{r}
+chessData <- read.csv("chessGames.csv")
+```
+
+## Finding rating differnce in each game
+```{r}
+#assign to games to modify structure
+games = chessData
+games$rating_diff <- (games$white_rating - games$black_rating)
+
+#categorical variable
+games$winner = factor(games$winner)
+```
+
+```{r}
+#separating moves in white moves and black moves
+
+games$moves <- strsplit(as.character(games$moves)," ")
+for(i in 1:nrow(games)){
+  temp <- unlist(games$moves[i])
+  games$white_moves[i]<- paste(temp[c(TRUE,FALSE)], collapse = " ")
+  games$black_moves[i]<- paste(temp[c(FALSE,TRUE)], collapse = " ")
+}
+
+#finding who has more center control in opening
+
+for(i in 1:nrow(games)){
+  #for white
+  counter <- 0
+  for(j in 1:length(unlist(games$white_moves[i]))){
+    temp <- unlist(games$white_moves[i])[j]
+    #Moves to the middle are strong, unless it's the king!
+    if(grepl("K", temp, fixed = TRUE) == FALSE){
+      if (grepl("d4", temp, fixed = TRUE) == TRUE){
+        counter <- counter + 1
+      }
+      else if (grepl("e4", temp, fixed = TRUE) == TRUE){
+        counter <- counter + 1
+      }
+      else if (grepl("d5", temp, fixed = TRUE) == TRUE){
+        counter <- counter + 1
+      }
+      else if (grepl("e5", temp, fixed = TRUE) == TRUE){
+        counter <- counter + 1
+      }
+    }
+  }
+  games$white_center[i] <- counter
+  
+  #now for black
+  counter <- 0
+  for(j in 1:length(unlist(games$black_moves[i]))){
+    temp <- unlist(games$black_moves[i])[j]
+    if(grepl("K", temp, fixed = TRUE) == FALSE){
+      if (grepl("d4", temp, fixed = TRUE) == TRUE){
+        counter <- counter + 1
+      }
+      else if (grepl("e4", temp, fixed = TRUE) == TRUE){
+        counter <- counter + 1
+      }
+      else if (grepl("d5", temp, fixed = TRUE) == TRUE){
+        counter <- counter + 1
+      }
+      else if (grepl("e5", temp, fixed = TRUE) == TRUE){
+        counter <- counter + 1
+      }
+    }
+  }
+  games$black_center[i] <- counter
+}
+
+#storing in one variable (If Pos: WHITE, If Neg: Black)
+games$center_control <- (games$white_center-games$black_center)
+```
+
+## Decision Tree (Making Predection)
+```{r}
+chess = games
+#dividing data into training and testing(validating) 
+set.seed(1234)
+pd = sample(2, nrow(chess), replace = TRUE, prob = c(0.8,0.2))
+train = chess[pd==1,]
+validate = chess[pd==2,]
+```
+
+## Making tree based on rating differnce
+```{r}
+ratingDiffTree = ctree(winner~rating_diff, data = train, controls = ctree_control(mincriterion = 0.9, minsplit = 5000))
+ratingDiffTree
+plot(ratingDiffTree)
+```
+
+## predicting results of each games based on ratting difference tree
+```{r}
+#predicting results of each games based on ratting difference tree
+tab = table(predict(ratingDiffTree),train$winner)
+#correctness of tree in percentages
+(1-sum(diag(tab)/sum(tab)))*100
+```
+
+## Making tree based on center control in opening
+```{r}
+centerControlTree = ctree(winner~center_control, data = train)
+plot(centerControlTree)
+```
+
+## predicting results of each games based on center control tree
+```{r}
+#predicting results of each games based on center control tree
+tab = table(predict(centerControlTree),train$winner)
+#correctness of tree in percentages
+(1-sum(diag(tab)/sum(tab)))*100
+```
+
+## Making tree based on center control & rating difference
+```{r}
+centerAndRatingTree = ctree(winner~center_control+rating_diff, data = train, controls = ctree_control(mincriterion = 0.9, minsplit = 5000))
+centerAndRatingTree
+plot(centerAndRatingTree)
+```
+
+## predicting results of each games based on center control & rating differnce tree
+```{r}
+#predicting results of each games based on center control tree
+tab = table(predict(centerAndRatingTree),train$winner)
+#correctness of tree in percentages
+(1-sum(diag(tab)/sum(tab)))*100
+```
+
+
+
+
+
+
+

@@ -16,6 +16,6 @@
 
 ## HTML (Output Files)
 
-* Initial Analysys: [https://karanraj10.github.io/Chess-Analysis/initAnalysis.html]()
+* Initial Analysys: [](https://karanraj10.github.io/Chess-Analysis/initAnalysis.html)
 * Advanced Analysys: [https://karanraj10.github.io/Chess-Analysis/advancedAnalysis.html]()
 * On Board Analysys: [https://karanraj10.github.io/Chess-Analysis/onBoardAnalysis.html]()
